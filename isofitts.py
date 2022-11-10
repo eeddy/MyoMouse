@@ -6,9 +6,12 @@ import os
 import socket
 
 class FittsLawTest:
-    def __init__(self, game):
-        self.game = game
+    def __init__(self, num_circles=30, num_trials=15, class_mappings={}, savefile="out.pkl", fps=60, width=1250, height=750):
+        pygame.init()
         self.font = pygame.font.SysFont('helvetica', 40)
+        self.screen = pygame.display.set_mode([width, height])
+        self.clock = pygame.time.Clock()
+        # self.main_clock = time.perf_counter()
 
         # gameplay parameters
         self.BLACK = (0,0,0)
@@ -20,35 +23,35 @@ class FittsLawTest:
         self.pos_factor1 = self.big_rad/2
         self.pos_factor2 = (self.big_rad * math.sqrt(3))//2
 
+        self.done = False
         self.VEL = 5
         self.dwell_time = 3
-        self.num_of_circles = self.game.num_circles # this value will be a user input
+        self.num_of_circles = num_circles 
+        self.max_trial = num_trials
+        self.width = width
+        self.height = height
+        self.fps = fps
+        self.savefile = savefile
 
         # interface objects
         self.circles = []
-        self.cursor  = self.cursor = pygame.Rect(self.game.width//2 - 7, self.game.height//2 - 7, 14, 14)
+        self.cursor = pygame.Rect(self.width//2 - 7, self.height//2 - 7, 14, 14)
         self.goal_circle = -1
         self.get_new_goal_circle()
 
         self.current_direction = [0,0]
         self.window_increment = 50 # in ms
-
-        ## Track if connected to Delsys
-        self.sensor_connected = True
         
         ## Save or don't save
         self.LOGGING = True
         self.trial = 0
-        self.max_trial = self.game.num_trials
 
         # Socket for reading EMG
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) 
         self.sock.bind(('127.0.0.1', 12346))
 
-        self.main_clock = time.perf_counter()
-
     def draw(self):
-        self.game.screen.fill(self.BLACK)
+        self.screen.fill(self.BLACK)
         self.draw_circles()
         self.draw_cursor()
         self.draw_timer()
@@ -58,18 +61,18 @@ class FittsLawTest:
             self.angle = 0
             self.angle_increment = 360 // self.num_of_circles
             while self.angle < 360:
-                self.circles.append(pygame.Rect((self.game.width//2 - self.small_rad) + math.cos(math.radians(self.angle)) * self.big_rad, (self.game.height//2 - self.small_rad) + math.sin(math.radians(self.angle)) * self.big_rad, self.small_rad * 2, self.small_rad * 2))
+                self.circles.append(pygame.Rect((self.width//2 - self.small_rad) + math.cos(math.radians(self.angle)) * self.big_rad, (self.height//2 - self.small_rad) + math.sin(math.radians(self.angle)) * self.big_rad, self.small_rad * 2, self.small_rad * 2))
                 self.angle += self.angle_increment
 
         for circle in self.circles:
-            pygame.draw.circle(self.game.screen, self.RED, (circle.x + self.small_rad, circle.y + self.small_rad), self.small_rad, 2)
+            pygame.draw.circle(self.screen, self.RED, (circle.x + self.small_rad, circle.y + self.small_rad), self.small_rad, 2)
         
         
         goal_circle = self.circles[self.goal_circle]
-        pygame.draw.circle(self.game.screen, self.RED, (goal_circle.x + self.small_rad, goal_circle.y + self.small_rad), self.small_rad)
+        pygame.draw.circle(self.screen, self.RED, (goal_circle.x + self.small_rad, goal_circle.y + self.small_rad), self.small_rad)
             
     def draw_cursor(self):
-        pygame.draw.circle(self.game.screen, self.YELLOW, (self.cursor.x + 7, self.cursor.y + 7), 7)
+        pygame.draw.circle(self.screen, self.YELLOW, (self.cursor.x + 7, self.cursor.y + 7), 7)
 
     def draw_timer(self):
         if hasattr(self, 'dwell_timer'):
@@ -78,20 +81,16 @@ class FittsLawTest:
                 duration = round((toc-self.dwell_timer),2)
                 time_str = str(duration)
                 draw_text = self.font.render(time_str, 1, self.BLUE)
-                self.game.screen.blit(draw_text, (10, 10))
+                self.screen.blit(draw_text, (10, 10))
 
-    def run(self):
-        if self.sensor_connected:
-            self.print_caption()
-            self.draw()
-            self.run_game_process()
-            self.move()
+    def update_game(self):
+        self.draw()
+        self.run_game_process()
+        self.move()
     
     def run_game_process(self):
         self.check_collisions()
         self.check_events()
-        # comment this if not using keyboard
-        #self.check_keys()
 
     def check_collisions(self):
         circle = self.circles[self.goal_circle]
@@ -106,10 +105,8 @@ class FittsLawTest:
         # closing window
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                if self.LOGGING:
-                    self.save_log()
-                pygame.quit()
-                #sys.exit()
+                self.done = True
+                return
 
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_LEFT:
@@ -138,8 +135,10 @@ class FittsLawTest:
             # 4 = Flexion
             elif input_class == 4:
                 self.current_direction[0] -= self.VEL
+            
+            if self.LOGGING:
+                self.log(input_class)
 
-      
             ## CHECKING FOR COLLISION BETWEEN CURSOR AND RECTANGLES
             if event.type >= pygame.USEREVENT and event.type < pygame.USEREVENT + self.num_of_circles:
                 if self.dwell_timer is None:
@@ -155,26 +154,17 @@ class FittsLawTest:
                     else:
                         if self.LOGGING:
                             self.save_log()
-                        pygame.quit()
+                        self.done = True
             elif event.type == pygame.USEREVENT + self.num_of_circles:
                 if self.Event_Flag == False:
                     self.dwell_timer = None
                     self.duration = 0
 
-           
     def move(self):
-            #            HO
-            ##           ^
-            #            l 
-            #            l
-            # WF < ---   x   --- > WE
-            #            l
-            #            l 
-            #            v 
-            #           PoG
-        if self.cursor.x + self.current_direction[0] > 0 and self.cursor.x + self.current_direction[0] < self.game.width:
+        # Making sure its within the bounds of the screen
+        if self.cursor.x + self.current_direction[0] > 0 and self.cursor.x + self.current_direction[0] < self.width:
             self.cursor.x += self.current_direction[0]
-        if self.cursor.y + self.current_direction[1] > 0 and self.cursor.y + self.current_direction[1] < self.game.height:
+        if self.cursor.y + self.current_direction[1] > 0 and self.cursor.y + self.current_direction[1] < self.height:
             self.cursor.y += self.current_direction[1]
     
     def get_new_goal_circle(self):
@@ -191,10 +181,7 @@ class FittsLawTest:
                 self.next_circle_in = self.num_of_circles // 2
                 self.circle_jump = 0
 
-    def print_caption(self):
-        pygame.display.set_caption(str(self.game.clock.get_fps()))
-
-    def log(self,emg, prob, direction):
+    def log(self, label):
         # [(trial_number) (goal_circle) (global_clock) (cursor_position) <EMG> <current direction> ]
         if not hasattr(self, 'log_dictionary'):
             self.log_dictionary = {
@@ -202,50 +189,29 @@ class FittsLawTest:
                 'goal_circle' :      [],
                 'global_clock' :     [],
                 'cursor_position':   [],
-                'EMG':               [],
-                'current_prob':      [],
+                'class_label':       [],
                 'current_direction': []
             }
-        # add time since start
+    #     # add time since start
         
         self.log_dictionary['trial_number'].append(self.trial)
         self.log_dictionary['goal_circle'].append(self.goal_circle)
         self.log_dictionary['global_clock'].append(time.perf_counter())
         self.log_dictionary['cursor_position'].append((self.cursor.x, self.cursor.y))
-        self.log_dictionary['EMG'].append(emg) 
-        self.log_dictionary['current_prob'].append(prob)
-        self.log_dictionary['current_direction'].append(direction)
+        self.log_dictionary['class_label'].append(label) 
+        self.log_dictionary['current_direction'].append(self.current_direction)
 
     def save_log(self):
         if not os.path.exists('results'):
             os.mkdir('results')
-        with open('results/'+self.game.savefile, 'wb') as f:
+        # Adding timestamp
+        with open('results/'+ str(round(time.time() * 1000)) + "_" + self.savefile, 'wb') as f:
             pickle.dump(self.log_dictionary, f)
 
-class Game:
-    # just for interfacing with pygame
-    def __init__(self, num_circles, device, model, class_mappings={}, num_trials=15, savefile="tmp.pkl", fps=60, width=1250, height=750):
-        pygame.init()
-
-        self.num_circles = num_circles
-        self.device = device
-        self.model = model
-        self.class_mappings = class_mappings
-        self.savefile = savefile
-        self.num_trials = num_trials
-
-        self.fps = fps
-        self.width = width
-        self.height = height
-        self.screen = pygame.display.set_mode([width, height])
-        self.clock = pygame.time.Clock()
-        self.fitts_law = FittsLawTest(self)
-
     def run(self):
-        self.fitts_law.done = False
-        
-        while not self.fitts_law.done:
+        while not self.done:
             # updated frequently for graphics & gameplay
-            self.fitts_law.run()
+            self.update_game()
             pygame.display.update()
             self.clock.tick(self.fps)
+        pygame.quit()

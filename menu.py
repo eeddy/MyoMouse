@@ -6,7 +6,7 @@ from unb_emg_toolbox.data_handler import OnlineDataHandler, OfflineDataHandler
 from unb_emg_toolbox.utils import make_regex
 from unb_emg_toolbox.feature_extractor import FeatureExtractor
 from unb_emg_toolbox.emg_classifier import OnlineEMGClassifier
-from isofitts import Game
+from isofitts import FittsLawTest
 
 class Menu:
     def __init__(self):
@@ -19,6 +19,7 @@ class Menu:
         self.odh.get_data()
 
         self.classifier = None
+        self.model_str = None
 
         self.window = None
         self.initialize_ui()
@@ -27,22 +28,33 @@ class Menu:
     def initialize_ui(self):
         # Create the simple menu UI:
         self.window = Tk()
+        if not self.model_str:
+            self.model_str = StringVar(value='LDA')
+        else:
+            self.model_str = StringVar(value=self.model_str.get())
         self.window.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.window.title("Game Menu")
-        self.window.geometry("500x200")
+        self.window.geometry("500x250")
 
         # Label 
-        Label(self.window, font=("Arial bold", 20), text = 'UNB EMG Toolbox - Game Demo').pack(pady=(10,20))
+        Label(self.window, font=("Arial bold", 20), text = 'UNB EMG Toolbox - Isofitts Demo').pack(pady=(10,20))
         # Train Model Button
         Button(self.window, font=("Arial", 18), text = 'Get Training Data', command=self.launch_training).pack(pady=(0,20))
-        # Play Snake Button
+        # Start Isofitts
         Button(self.window, font=("Arial", 18), text = 'Start Isofitts', command=self.start_test).pack()
+        
+        # Model Input
+        frame = Frame(self.window)
+        Label(self.window, text="Model:", font=("Arial bold", 18)).pack(in_=frame, side=LEFT, padx=(0,10))
+        Entry(self.window, font=("Arial", 18), textvariable=self.model_str).pack(in_=frame, side=LEFT)
+        frame.pack(pady=(20,10))
+        # entry.grid(row=5, column=1, sticky=N+S+W+E, padx=(0,10))
+            
 
     def start_test(self):
         self.window.destroy()
         self.set_up_classifier()
-        game = Game(60, 1250, 750)
-        game.run()
+        FittsLawTest(num_trials=5).run()
         # Its important to stop the classifier after the game has ended
         # Otherwise it will continuously run in a seperate process
         self.classifier.stop_running()
@@ -55,8 +67,8 @@ class Menu:
         self.initialize_ui()
 
     def set_up_classifier(self):
-        WINDOW_SIZE = 50 
-        WINDOW_INCREMENT = 10
+        WINDOW_SIZE = 25 
+        WINDOW_INCREMENT = 5
 
         # Step 1: Parse offline training data
         dataset_folder = 'data/'
@@ -86,8 +98,8 @@ class Menu:
         data_set['training_labels'] = train_metadata['classes']
 
         # Step 4: Create online EMG classifier and start classifying.
-        self.classifier = OnlineEMGClassifier(model="LDA", data_set=data_set, num_channels=8, window_size=WINDOW_SIZE, window_increment=WINDOW_INCREMENT, 
-                online_data_handler=self.odh, features=feature_list, rejection_type='CONFIDENCE', rejection_threshold=0.95)
+        self.classifier = OnlineEMGClassifier(model=self.model_str.get(), data_set=data_set, num_channels=8, window_size=WINDOW_SIZE, window_increment=WINDOW_INCREMENT, 
+                online_data_handler=self.odh, features=feature_list)
         self.classifier.run(block=False) # block set to false so it will run in a seperate process.
 
     def on_closing(self):
