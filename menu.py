@@ -54,7 +54,7 @@ class Menu:
     def start_test(self):
         self.window.destroy()
         self.set_up_classifier()
-        FittsLawTest(num_trials=5).run()
+        FittsLawTest(num_trials=5, savefile=self.model_str.get() + ".pkl").run()
         # Its important to stop the classifier after the game has ended
         # Otherwise it will continuously run in a seperate process
         self.classifier.stop_running()
@@ -63,7 +63,7 @@ class Menu:
     def launch_training(self):
         self.window.destroy()
         # Launch training ui
-        TrainingUI(num_reps=1, rep_time=5, rep_folder="classes/", output_folder="data/", data_handler=self.odh)
+        TrainingUI(num_reps=5, rep_time=5, rep_folder="classes/", output_folder="data/", data_handler=self.odh)
         self.initialize_ui()
 
     def set_up_classifier(self):

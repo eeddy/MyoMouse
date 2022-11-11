@@ -6,12 +6,21 @@ import os
 import socket
 
 class FittsLawTest:
-    def __init__(self, num_circles=30, num_trials=15, class_mappings={}, savefile="out.pkl", fps=60, width=1250, height=750):
+    def __init__(self, num_circles=30, num_trials=15, savefile="out.pkl", logging=True, fps=60, width=1250, height=750):
         pygame.init()
         self.font = pygame.font.SysFont('helvetica', 40)
         self.screen = pygame.display.set_mode([width, height])
         self.clock = pygame.time.Clock()
-        # self.main_clock = time.perf_counter()
+        
+        # logging information
+        self.log_dictionary = {
+            'trial_number':      [],
+            'goal_circle' :      [],
+            'global_clock' :     [],
+            'cursor_position':   [],
+            'class_label':       [],
+            'current_direction': []
+        }
 
         # gameplay parameters
         self.BLACK = (0,0,0)
@@ -24,7 +33,7 @@ class FittsLawTest:
         self.pos_factor2 = (self.big_rad * math.sqrt(3))//2
 
         self.done = False
-        self.VEL = 5
+        self.VEL = 3
         self.dwell_time = 3
         self.num_of_circles = num_circles 
         self.max_trial = num_trials
@@ -32,19 +41,15 @@ class FittsLawTest:
         self.height = height
         self.fps = fps
         self.savefile = savefile
+        self.logging = logging
+        self.trial = 0
 
         # interface objects
         self.circles = []
         self.cursor = pygame.Rect(self.width//2 - 7, self.height//2 - 7, 14, 14)
         self.goal_circle = -1
         self.get_new_goal_circle()
-
         self.current_direction = [0,0]
-        self.window_increment = 50 # in ms
-        
-        ## Save or don't save
-        self.LOGGING = True
-        self.trial = 0
 
         # Socket for reading EMG
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) 
@@ -66,7 +71,6 @@ class FittsLawTest:
 
         for circle in self.circles:
             pygame.draw.circle(self.screen, self.RED, (circle.x + self.small_rad, circle.y + self.small_rad), self.small_rad, 2)
-        
         
         goal_circle = self.circles[self.goal_circle]
         pygame.draw.circle(self.screen, self.RED, (goal_circle.x + self.small_rad, goal_circle.y + self.small_rad), self.small_rad)
@@ -136,7 +140,7 @@ class FittsLawTest:
             elif input_class == 4:
                 self.current_direction[0] -= self.VEL
             
-            if self.LOGGING:
+            if self.logging:
                 self.log(input_class)
 
             ## CHECKING FOR COLLISION BETWEEN CURSOR AND RECTANGLES
@@ -152,7 +156,7 @@ class FittsLawTest:
                     if self.trial < self.max_trial-1: # -1 because max_trial is 1 indexed
                         self.trial += 1
                     else:
-                        if self.LOGGING:
+                        if self.logging:
                             self.save_log()
                         self.done = True
             elif event.type == pygame.USEREVENT + self.num_of_circles:
@@ -182,20 +186,8 @@ class FittsLawTest:
                 self.circle_jump = 0
 
     def log(self, label):
-        # [(trial_number) (goal_circle) (global_clock) (cursor_position) <EMG> <current direction> ]
-        if not hasattr(self, 'log_dictionary'):
-            self.log_dictionary = {
-                'trial_number':      [],
-                'goal_circle' :      [],
-                'global_clock' :     [],
-                'cursor_position':   [],
-                'class_label':       [],
-                'current_direction': []
-            }
-    #     # add time since start
-        
         self.log_dictionary['trial_number'].append(self.trial)
-        self.log_dictionary['goal_circle'].append(self.goal_circle)
+        self.log_dictionary['goal_circle'].append(self.circles[self.goal_circle])
         self.log_dictionary['global_clock'].append(time.perf_counter())
         self.log_dictionary['cursor_position'].append((self.cursor.x, self.cursor.y))
         self.log_dictionary['class_label'].append(label) 
