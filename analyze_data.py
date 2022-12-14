@@ -3,15 +3,15 @@ import numpy as np
 import math
 import matplotlib.pyplot as plt
 from os import walk
-from unb_emg_toolbox.emg_classifier import EMGClassifier
-from unb_emg_toolbox.feature_extractor import FeatureExtractor
-from unb_emg_toolbox.utils import make_regex
-from unb_emg_toolbox.data_handler import OfflineDataHandler
-from unb_emg_toolbox.offline_metrics import OfflineMetrics
+from libemg.emg_classifier import EMGClassifier
+from libemg.feature_extractor import FeatureExtractor
+from libemg.utils import make_regex
+from libemg.data_handler import OfflineDataHandler
+from libemg.offline_metrics import OfflineMetrics
 
 def evaluate_offline_data():
-    WINDOW_SIZE = 25
-    WINDOW_INCREMENT = 5
+    WINDOW_SIZE = 40
+    WINDOW_INCREMENT = 20
 
     offline_metrics = {
         'classifier': [],
@@ -32,7 +32,7 @@ def evaluate_offline_data():
     odh = OfflineDataHandler()
     odh.get_data(folder_location=dataset_folder, filename_dic = dic, delimiter=",")
 
-    fe = FeatureExtractor(num_channels=8)
+    fe = FeatureExtractor()
 
     train_odh = odh.isolate_data(key="reps", values=[0,1,2])
     train_windows, train_metadata = train_odh.parse_windows(WINDOW_SIZE,WINDOW_INCREMENT)
@@ -49,8 +49,9 @@ def evaluate_offline_data():
     metrics = ['CA', 'AER', 'INS', 'RECALL', 'PREC', 'F1']
     # Normal Case - Test all different classifiers
     for model in ['LDA', 'SVM', 'KNN', 'NB']:
-        classifier = EMGClassifier(model, data_set.copy())
-        preds = classifier.run()
+        classifier = EMGClassifier()
+        classifier.fit(model, data_set.copy())
+        preds, probs = classifier.run(data_set['testing_features'], data_set['testing_labels'])
         out_metrics = om.extract_offline_metrics(metrics, data_set['testing_labels'], preds, 2)
         offline_metrics['classifier'].append(model)
         offline_metrics['metrics'].append(out_metrics)

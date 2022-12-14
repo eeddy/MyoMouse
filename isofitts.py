@@ -33,7 +33,7 @@ class FittsLawTest:
         self.pos_factor2 = (self.big_rad * math.sqrt(3))//2
 
         self.done = False
-        self.VEL = 3
+        self.VEL = 10
         self.dwell_time = 3
         self.num_of_circles = num_circles 
         self.max_trial = num_trials

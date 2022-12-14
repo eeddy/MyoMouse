@@ -1,22 +1,20 @@
 import multiprocessing
 from tkinter import *
-from streamers import stream_myo
-from unb_emg_toolbox.training_ui import TrainingUI
-from unb_emg_toolbox.data_handler import OnlineDataHandler, OfflineDataHandler
-from unb_emg_toolbox.utils import make_regex
-from unb_emg_toolbox.feature_extractor import FeatureExtractor
-from unb_emg_toolbox.emg_classifier import OnlineEMGClassifier
+from libemg.streamers import myo_streamer
+from libemg.screen_guided_training import ScreenGuidedTraining
+from libemg.data_handler import OnlineDataHandler, OfflineDataHandler
+from libemg.utils import make_regex
+from libemg.feature_extractor import FeatureExtractor
+from libemg.emg_classifier import OnlineEMGClassifier
 from isofitts import FittsLawTest
 
 class Menu:
     def __init__(self):
-        # Myo Streamer - start streaming the myo data 
-        self.myo = multiprocessing.Process(target=stream_myo, daemon=True)
-        self.myo.start()
+        myo_streamer()
 
         # Create online data handler to listen for the data
         self.odh = OnlineDataHandler(emg_arr=True)
-        self.odh.get_data()
+        self.odh.start_listening()
 
         self.classifier = None
         self.model_str = None
@@ -48,13 +46,12 @@ class Menu:
         Label(self.window, text="Model:", font=("Arial bold", 18)).pack(in_=frame, side=LEFT, padx=(0,10))
         Entry(self.window, font=("Arial", 18), textvariable=self.model_str).pack(in_=frame, side=LEFT)
         frame.pack(pady=(20,10))
-        # entry.grid(row=5, column=1, sticky=N+S+W+E, padx=(0,10))
             
 
     def start_test(self):
         self.window.destroy()
         self.set_up_classifier()
-        FittsLawTest(num_trials=5, savefile=self.model_str.get() + ".pkl").run()
+        FittsLawTest(num_trials=8, num_circles=8, savefile=self.model_str.get() + ".pkl").run()
         # Its important to stop the classifier after the game has ended
         # Otherwise it will continuously run in a seperate process
         self.classifier.stop_running()
@@ -62,13 +59,14 @@ class Menu:
 
     def launch_training(self):
         self.window.destroy()
+        training_ui = ScreenGuidedTraining()
         # Launch training ui
-        TrainingUI(num_reps=5, rep_time=5, rep_folder="classes/", output_folder="data/", data_handler=self.odh)
+        training_ui.launch_training(self.odh, 3, 5, "classes/", "data/", 3)
         self.initialize_ui()
 
     def set_up_classifier(self):
-        WINDOW_SIZE = 25 
-        WINDOW_INCREMENT = 5
+        WINDOW_SIZE = 40 
+        WINDOW_INCREMENT = 20
 
         # Step 1: Parse offline training data
         dataset_folder = 'data/'
@@ -88,7 +86,7 @@ class Menu:
         train_windows, train_metadata = odh.parse_windows(WINDOW_SIZE, WINDOW_INCREMENT)
 
         # Step 2: Extract features from offline data
-        fe = FeatureExtractor(num_channels=8)
+        fe = FeatureExtractor()
         feature_list = fe.get_feature_groups()['HTD']
         training_features = fe.extract_features(feature_list, train_windows)
 
@@ -98,14 +96,13 @@ class Menu:
         data_set['training_labels'] = train_metadata['classes']
 
         # Step 4: Create online EMG classifier and start classifying.
-        self.classifier = OnlineEMGClassifier(model=self.model_str.get(), data_set=data_set, num_channels=8, window_size=WINDOW_SIZE, window_increment=WINDOW_INCREMENT, 
+        self.classifier = OnlineEMGClassifier(model=self.model_str.get(), data_set=data_set, window_size=WINDOW_SIZE, window_increment=WINDOW_INCREMENT, 
                 online_data_handler=self.odh, features=feature_list)
         self.classifier.run(block=False) # block set to false so it will run in a seperate process.
 
     def on_closing(self):
         # Clean up all the processes that have been started
-        self.myo.terminate()
-        self.odh.stop_data()
+        self.odh.stop_listening()
         self.window.destroy()
 
 if __name__ == "__main__":
