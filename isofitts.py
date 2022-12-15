@@ -98,7 +98,7 @@ class FittsLawTest:
 
     def check_collisions(self):
         circle = self.circles[self.goal_circle]
-        if math.sqrt((circle.centerx - self.cursor.centerx)**2 + (circle.centery - self.cursor.centery)**2) < 47:
+        if math.sqrt((circle.centerx - self.cursor.centerx)**2 + (circle.centery - self.cursor.centery)**2) < (circle[2]/2 + self.cursor[2]/2):
             pygame.event.post(pygame.event.Event(pygame.USEREVENT + self.goal_circle))
             self.Event_Flag = True
         else:
@@ -186,10 +186,11 @@ class FittsLawTest:
                 self.circle_jump = 0
 
     def log(self, label):
+        circle = self.circles[self.goal_circle]
         self.log_dictionary['trial_number'].append(self.trial)
-        self.log_dictionary['goal_circle'].append(self.circles[self.goal_circle])
+        self.log_dictionary['goal_circle'].append((circle.centerx, circle.centery, circle[2]))
         self.log_dictionary['global_clock'].append(time.perf_counter())
-        self.log_dictionary['cursor_position'].append((self.cursor.x, self.cursor.y))
+        self.log_dictionary['cursor_position'].append((self.cursor.centerx, self.cursor.centery, self.cursor[2]))
         self.log_dictionary['class_label'].append(label) 
         self.log_dictionary['current_direction'].append(self.current_direction)
 
