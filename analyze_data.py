@@ -76,7 +76,7 @@ def calculate_overshoots(data):
     return overshoots
 
 def in_circle(cursor, circle):
-    return (cursor[0] - circle[0])^2 + (cursor[1] - circle[1])^2 < circle[3]^2
+    return (cursor[0] - circle[0])**2 + (cursor[1] - circle[1])**2 < circle[3]**2
 
 def calculate_efficiency(data):
     efficiency = []
