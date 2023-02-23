@@ -5,7 +5,7 @@ from libemg.screen_guided_training import ScreenGuidedTraining
 from libemg.data_handler import OnlineDataHandler, OfflineDataHandler
 from libemg.utils import make_regex
 from libemg.feature_extractor import FeatureExtractor
-from libemg.emg_classifier import OnlineEMGClassifier
+from libemg.emg_classifier import OnlineEMGClassifier, EMGClassifier
 from isofitts import FittsLawTest
 
 class Menu:
@@ -13,7 +13,7 @@ class Menu:
         myo_streamer()
 
         # Create online data handler to listen for the data
-        self.odh = OnlineDataHandler(emg_arr=True)
+        self.odh = OnlineDataHandler()
         self.odh.start_listening()
 
         self.classifier = None
@@ -35,7 +35,7 @@ class Menu:
         self.window.geometry("500x250")
 
         # Label 
-        Label(self.window, font=("Arial bold", 20), text = 'UNB EMG Toolbox - Isofitts Demo').pack(pady=(10,20))
+        Label(self.window, font=("Arial bold", 20), text = 'LibEMG - Isofitts Demo').pack(pady=(10,20))
         # Train Model Button
         Button(self.window, font=("Arial", 18), text = 'Get Training Data', command=self.launch_training).pack(pady=(0,20))
         # Start Isofitts
@@ -60,8 +60,8 @@ class Menu:
     def launch_training(self):
         self.window.destroy()
         training_ui = ScreenGuidedTraining()
-        # Launch training ui
-        training_ui.launch_training(self.odh, 3, 5, "classes/", "data/", 3)
+        training_ui.download_gestures([1,2,3,4,5], "classes/")
+        training_ui.launch_training(self.odh, 5, 3, "classes/", "data/", 1)
         self.initialize_ui()
 
     def set_up_classifier(self):
@@ -87,7 +87,7 @@ class Menu:
 
         # Step 2: Extract features from offline data
         fe = FeatureExtractor()
-        feature_list = fe.get_feature_groups()['HTD']
+        feature_list = fe.get_feature_groups()['LS4']
         training_features = fe.extract_features(feature_list, train_windows)
 
         # Step 3: Dataset creation
@@ -95,9 +95,12 @@ class Menu:
         data_set['training_features'] = training_features
         data_set['training_labels'] = train_metadata['classes']
 
-        # Step 4: Create online EMG classifier and start classifying.
-        self.classifier = OnlineEMGClassifier(model=self.model_str.get(), data_set=data_set, window_size=WINDOW_SIZE, window_increment=WINDOW_INCREMENT, 
-                online_data_handler=self.odh, features=feature_list)
+        # Step 4: Create the EMG Classifier
+        o_classifier = EMGClassifier()
+        o_classifier.fit(model=self.model_str.get(), feature_dictionary=data_set)
+
+        # Step 5: Create online EMG classifier and start classifying.
+        self.classifier = OnlineEMGClassifier(o_classifier, WINDOW_SIZE, WINDOW_INCREMENT, self.odh, feature_list)
         self.classifier.run(block=False) # block set to false so it will run in a seperate process.
 
     def on_closing(self):
