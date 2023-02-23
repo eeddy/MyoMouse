@@ -1,5 +1,4 @@
 from tkinter import *
-from isofitts import FittsLawTest
 from myo_mouse import MyoMouse
 from libemg.screen_guided_training import ScreenGuidedTraining
 from libemg.data_handler import OnlineDataHandler, OfflineDataHandler
@@ -30,27 +29,16 @@ class Menu:
         self.window = Tk()
         self.window.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.window.title("Game Menu")
-        self.window.geometry("500x400")
+        self.window.geometry("500x275")
         self.proportional = BooleanVar(value=False)
 
         Label(self.window, font=("Arial bold", 20), text = 'LibEMG - Mouse Demo').pack(pady=(10,20))
         # Train Model Button
         Button(self.window, font=("Arial", 18), text = 'Train Model', command=self.launch_training).pack(pady=(0,20))
         # Start Isofitts
-        Button(self.window, font=("Arial", 18), text = 'Start Isofitts', command=self.start_test).pack(pady=(0,20))
-        # Mouse Interface
         Button(self.window, font=("Arial", 18), text = 'Start Mouse', command=self.start_mouse).pack(pady=(0,20))
         # Checkbox for proportional control
         Checkbutton(self.window, text='Proportional', font=("Arial", 18), variable=self.proportional, onvalue=True, offvalue=False).pack()
-
-    def start_test(self):
-        self.window.destroy()
-        self.set_up_classifier()
-        FittsLawTest(num_trials=8, num_circles=8, savefile=str(self.proportional.get()) + ".pkl", proportional_control=self.proportional.get()).run()
-        # Its important to stop the classifier after the game has ended
-        # Otherwise it will continuously run in a seperate process
-        self.classifier.stop_running()
-        self.initialize_ui()
 
     def start_mouse(self):
         self.window.destroy()
@@ -61,7 +49,7 @@ class Menu:
         self.window.destroy()
         # Launch training ui
         training_ui = ScreenGuidedTraining()
-        training_ui.download_gestures([1,2,3,4,5,27], "classes/")
+        training_ui.download_gestures([1,2,3,4,5,12,27], "classes/")
         training_ui.launch_training(self.odh, 4, 2, "classes/", "data/", 1)
         self.initialize_ui()
 
@@ -100,7 +88,7 @@ class Menu:
         o_classifier = EMGClassifier()
         o_classifier.fit(model="LDA", feature_dictionary=data_set)
         o_classifier.add_velocity(train_windows=train_windows, train_labels=train_metadata['classes'])
-        o_classifier.add_rejection(0.95)
+        o_classifier.add_rejection(0.90)
 
         # Step 5: Create online EMG classifier and start classifying.
         self.classifier = OnlineEMGClassifier(o_classifier, WINDOW_SIZE, WINDOW_INCREMENT, self.odh, feature_list)
