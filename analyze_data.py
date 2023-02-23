@@ -9,54 +9,6 @@ from libemg.utils import make_regex
 from libemg.data_handler import OfflineDataHandler
 from libemg.offline_metrics import OfflineMetrics
 
-def evaluate_offline_data():
-    WINDOW_SIZE = 40
-    WINDOW_INCREMENT = 20
-
-    offline_metrics = {
-        'classifier': [],
-        'metrics': [],
-    }
-
-    dataset_folder = 'data'
-    classes_values = ["0","1","2","3","4"]
-    classes_regex = make_regex(left_bound = "_C_", right_bound=".csv", values = classes_values)
-    reps_values = ["0","1","2","3","4"]
-    reps_regex = make_regex(left_bound = "R_", right_bound="_C_", values = reps_values)
-    dic = {
-        "reps": reps_values,
-        "reps_regex": reps_regex,
-        "classes": classes_values,
-        "classes_regex": classes_regex
-    }
-    odh = OfflineDataHandler()
-    odh.get_data(folder_location=dataset_folder, filename_dic = dic, delimiter=",")
-
-    fe = FeatureExtractor()
-
-    train_odh = odh.isolate_data(key="reps", values=[0,1,2])
-    train_windows, train_metadata = train_odh.parse_windows(WINDOW_SIZE,WINDOW_INCREMENT)
-    test_odh = odh.isolate_data(key="reps", values=[3,4])
-    test_windows, test_metadata = test_odh.parse_windows(WINDOW_SIZE,WINDOW_INCREMENT)
-
-    data_set = {}
-    data_set['testing_features'] = fe.extract_feature_group('HTD', test_windows)
-    data_set['training_features'] = fe.extract_feature_group('HTD', train_windows)
-    data_set['testing_labels'] = test_metadata['classes']
-    data_set['training_labels'] = train_metadata['classes']
-
-    om = OfflineMetrics()
-    metrics = ['CA', 'AER', 'INS']
-    # Normal Case - Test all different classifiers
-    for model in ['LDA', 'SVM', 'KNN', 'NB']:
-        classifier = EMGClassifier()
-        classifier.fit(model, data_set.copy())
-        preds, probs = classifier.run(data_set['testing_features'], data_set['testing_labels'])
-        out_metrics = om.extract_offline_metrics(metrics, data_set['testing_labels'], preds, 2)
-        offline_metrics['classifier'].append(model)
-        offline_metrics['metrics'].append(out_metrics)
-    return offline_metrics
-
 def read_pickle(location):
     with open(location, 'rb') as f:
         data = pickle.load(f)
@@ -94,7 +46,7 @@ def calculate_throughput(data):
     for t in trials:
         t_idxs = np.where(data['trial_number'] == t)[0]
         distance = math.dist((data['cursor_position'][t_idxs[0]])[0:2], (data['goal_circle'][t_idxs[0]])[0:2])
-        width = (data['goal_circle'][t_idxs[0]])[2]
+        width = (data['goal_circle'][t_idxs[0]])[2] / 2
         id = math.log2(distance/width + 1) 
         time = data['global_clock'][t_idxs[-1]] - data['global_clock'][t_idxs[0]]
         throughput.append(id/time)
@@ -116,41 +68,31 @@ def evaluate_fitts_data():
     path = 'results/'
     filenames = next(walk(path), (None, None, []))[2]
     fitts_metrics = {
-        'classifier': [],
+        'trial': [],
         'metrics': [],
     }
     
     for file in filenames:
         data = read_pickle(path + file)
-        fitts_metrics['classifier'].append(file.split('_')[1])
+        fitts_metrics['trial'].append(file.split('_')[1])
         fitts_metrics['metrics'].append(extract_fitts_metrics(data))
 
     return fitts_metrics
 
 if __name__ == "__main__":
-    offline_metrics = evaluate_offline_data()
     fitts_metrics = evaluate_fitts_data()
 
     num_models = len(fitts_metrics['metrics'][0])
 
-    # Plot bar chart for each classifier - lets look at CA, AER and INS for each classifier
-    o_mets = ['CA', 'AER', 'INS']
     f_mets = ['throughput', 'efficiency', 'overshoots']
-    fig, axs = plt.subplots(num_models, 2)
+    fig, axs = plt.subplots(3)
     for i in range(0, 3):
-        # Plot CA, AER and INS
-        x = [x for x in offline_metrics['classifier']]
-        y = [(offline_metrics['metrics'][y])[o_mets[i]] for y in range(0, len(offline_metrics['classifier']))]
-        axs[i, 0].bar(x,y)
-        axs[i, 0].set_title(o_mets[i])
-        
         # Plot throughput, efficiency and overshoots 
-        x = [x for x in fitts_metrics['classifier']]
-        y = [(fitts_metrics['metrics'][y])[f_mets[i]] for y in range(0, len(fitts_metrics['classifier']))]
-        axs[i, 1].bar(x,y)
-        axs[i, 1].set_title(f_mets[i])
+        x = [x for x in fitts_metrics['trial']]
+        y = [(fitts_metrics['metrics'][y])[f_mets[i]] for y in range(0, len(fitts_metrics['trial']))]
+        axs[i].bar(x,y)
+        axs[i].set_title(f_mets[i])
 
     plt.show()
 
-    print(offline_metrics)
     print(fitts_metrics)

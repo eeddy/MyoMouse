@@ -6,12 +6,13 @@ import os
 import socket
 
 class FittsLawTest:
-    def __init__(self, num_circles=30, num_trials=15, savefile="out.pkl", logging=True, fps=60, width=1250, height=750):
+    def __init__(self, num_circles=30, num_trials=15, savefile="out.pkl", logging=True, fps=60, width=1250, height=750, proportional_control=False):
         pygame.init()
         self.font = pygame.font.SysFont('helvetica', 40)
         self.screen = pygame.display.set_mode([width, height])
         self.clock = pygame.time.Clock()
-        
+        self.proportional_control = proportional_control
+
         # logging information
         self.log_dictionary = {
             'trial_number':      [],
@@ -33,7 +34,10 @@ class FittsLawTest:
         self.pos_factor2 = (self.big_rad * math.sqrt(3))//2
 
         self.done = False
-        self.VEL = 10
+        if self.proportional_control:
+            self.VEL = 40
+        else:
+            self.VEL = 20
         self.dwell_time = 3
         self.num_of_circles = num_circles 
         self.max_trial = num_trials
@@ -127,18 +131,23 @@ class FittsLawTest:
         data = str(data.decode("utf-8"))
         if data:
             input_class = float(data.split(' ')[0])
+            if self.proportional_control:
+                multiplier = float(data.split(' ')[1])
+                multiplier - multiplier * math.exp(multiplier)
+            else:
+                multiplier = 1
             # 0 = Hand Closed = down
             if input_class == 0:
-                self.current_direction[1] += self.VEL
+                self.current_direction[1] += self.VEL * multiplier
             # 1 = Hand Open
             elif input_class == 1:
-                self.current_direction[1] -= self.VEL
+                self.current_direction[1] -= self.VEL * multiplier
             # 3 = Extension 
-            elif input_class == 3:
-                self.current_direction[0] += self.VEL
-            # 4 = Flexion
             elif input_class == 4:
-                self.current_direction[0] -= self.VEL
+                self.current_direction[0] += self.VEL * multiplier
+            # 4 = Flexion
+            elif input_class == 5:
+                self.current_direction[0] -= self.VEL * multiplier
             
             if self.logging:
                 self.log(input_class)
