@@ -49,7 +49,7 @@ class Menu:
         self.window.destroy()
         # Launch training ui
         training_ui = ScreenGuidedTraining()
-        training_ui.download_gestures([1,2,3,4,5,12,27], "classes/")
+        training_ui.download_gestures([1,2,3,4,5], "classes/")
         training_ui.launch_training(self.odh, 4, 2, "classes/", "data/", 1)
         self.initialize_ui()
 
@@ -59,7 +59,7 @@ class Menu:
 
         # Step 1: Parse offline training data
         dataset_folder = 'data/'
-        classes_values = ["0","1","2","3","4","5","6"]
+        classes_values = ["0","1","2","3","4"]
         classes_regex = make_regex(left_bound = "_C_", right_bound=".csv", values = classes_values)
         reps_values = ["0", "1", "2", "3"]
         reps_regex = make_regex(left_bound = "R_", right_bound="_C_", values = reps_values)
